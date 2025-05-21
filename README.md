@@ -49,6 +49,8 @@ Query  →       v       →  Top-k Results
 
 ````markdown
 
+---
+
 ### 1. Clone the Repository
 
 ```bash
