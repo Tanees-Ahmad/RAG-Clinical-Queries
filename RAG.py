@@ -1,10 +1,14 @@
-# rag.py
+# RAG.py
 import os
 import json
-from sentence_transformers import SentenceTransformer
 import numpy as np
+from sentence_transformers import SentenceTransformer
 import faiss
 import requests
+
+# ----------------------------
+# Data Loading & Flattening
+# ----------------------------
 
 def load_json_data(root_folder):
     data_list = []
@@ -31,26 +35,42 @@ def flatten_json_tree(tree, parent_key=""):
             flattened.append(full_key)
     return flattened
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# ----------------------------
+# Embedding & Indexing
+# ----------------------------
 
-data_list = load_json_data("samples")
-all_sentences = []
-metadata = []
+def initialize_index(data_folder="samples"):
+    model = SentenceTransformer('all-MiniLM-L6-v2')
 
-for data in data_list:
-    flat_sentences = flatten_json_tree(data)
-    all_sentences.extend(flat_sentences)
-    metadata.extend([data.get("input2", "")] * len(flat_sentences))
+    data_list = load_json_data(data_folder)
+    all_sentences = []
+    metadata = []
 
-embeddings = model.encode(all_sentences, show_progress_bar=True)
-dimension = embeddings.shape[1]
-index = faiss.IndexFlatL2(dimension)
-index.add(np.array(embeddings))
+    for data in data_list:
+        flat_sentences = flatten_json_tree(data)
+        all_sentences.extend(flat_sentences)
+        metadata.extend([data.get("input2", "")] * len(flat_sentences))
 
-def search(query, k=5):
+    embeddings = model.encode(all_sentences, show_progress_bar=True)
+
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(np.array(embeddings))
+
+    return model, index, all_sentences, metadata
+
+# ----------------------------
+# Search Function
+# ----------------------------
+
+def search(query, model, index, all_sentences, metadata, k=5):
     query_vec = model.encode([query])
     D, I = index.search(query_vec, k)
     return [(all_sentences[i], metadata[i]) for i in I[0]]
+
+# ----------------------------
+# LLM API Call
+# ----------------------------
 
 def llama2_ollama_generate(prompt):
     response = requests.post(
@@ -58,12 +78,10 @@ def llama2_ollama_generate(prompt):
         json={"model": "gemma:2b", "prompt": prompt},
         stream=True
     )
-
-    result = "" 
+    result = ""
     for line in response.iter_lines():
         if line:
             data = json.loads(line.decode('utf-8'))
             if 'response' in data:
                 result += data['response']
-    
     return result

@@ -1,43 +1,92 @@
 import streamlit as st
-from RAG import search, llama2_ollama_generate
 
-st.set_page_config(page_title="RAG with Gemma", layout="wide")
+# MUST BE FIRST
+st.set_page_config(page_title="RAG", layout="wide")
 
-st.title("📚 RAG Chat with Gemma")
-st.write("Ask a question based on your custom JSON knowledge base.")
+from RAG import initialize_index, search, llama2_ollama_generate
 
-query = st.text_input("Enter your query:", placeholder="e.g., What is the process flow for XYZ?")
-top_k = st.slider("Number of retrieved contexts:", min_value=1, max_value=10, value=5)
-
-if st.button("Generate Answer") and query:
-    with st.spinner("Retrieving relevant chunks..."):
-        results = search(query, k=top_k)
-        context = "\n".join([res[0] for res in results])
-
-        full_prompt = f"Use the following context to answer the question:\n\nContext:\n{context}\n\nQuestion:\n{query}\n\nAnswer:"
-        
-    with st.spinner("Generating response using Gemma..."):
-        response = llama2_ollama_generate(full_prompt)
-        
-    st.subheader("🔍 Retrieved Context")
-    for i, (chunk, meta) in enumerate(results):
-        st.markdown(f"**Chunk {i+1}:** {chunk}\n\n*Metadata:* `{meta}`")
-    
-    st.subheader("💬 Generated Answer")
-    st.markdown(response)
-
-# Optional styling
-st.markdown(
-    """
+# Inject custom CSS for full-width buttons and centered sidebar title
+st.markdown("""
     <style>
-        .stTextInput>div>div>input {
-            font-size: 16px;
+        div[data-testid="stSidebar"] {
+            padding-top: 2rem;
         }
-        .stButton>button {
+        .sidebar-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 2rem;
+        }
+        .sidebar-btn {
+            width: 100%;
+            display: block;
             background-color: #4CAF50;
             color: white;
+            padding: 0.75rem 1rem;
+            text-align: center;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .sidebar-btn:hover {
+            background-color: #388e3c;
         }
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
+
+# Sidebar navigation buttons using session state
+st.sidebar.markdown('<div class="sidebar-title">📚 Menu</div>', unsafe_allow_html=True)
+
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
+
+# Navigation buttons
+if st.sidebar.button("🏠 Home", use_container_width=True):
+    st.session_state.page = "Home"
+
+if st.sidebar.button("⚙️ Help", use_container_width=True):
+    st.session_state.page = "Help"
+
+# Cache model and index loading
+@st.cache_resource
+def get_index_and_data():
+    return initialize_index(data_folder="samples")
+
+# Load model and index once
+model, index, all_sentences, metadata = get_index_and_data()
+
+# ---------------------------------------
+# PAGE: HOME
+# ---------------------------------------
+if st.session_state.page == "Home":
+    st.markdown("<h1 style='text-align: center;'>RAG for Diagnostic Reasoning for Clinical Notes (DiReCT)</h1>", unsafe_allow_html=True)
+
+    with st.form("query_form"):
+        query = st.text_input("Ask a question based on data:")
+        col1, col2, col3 = st.columns([3, 1, 3])
+        with col2:
+            submitted = st.form_submit_button("🔍 Search")
+
+    if submitted and query.strip():
+        with st.spinner("🔍 Retrieving relevant data and generating detailed answer..."):
+
+            response = llama2_ollama_generate(query)
+
+        st.subheader("💬 Answer")
+        st.write(response)
+
+# ---------------------------------------
+# PAGE: HELP
+# ---------------------------------------
+elif st.session_state.page == "Help":
+    st.markdown("<h1 style='text-align: center;'>⚙️ Help and Cache Management</h1>", unsafe_allow_html=True)
+    st.write("Use this page to clear the cached model and index if you want to reload everything.")
+
+    # Center the button using columns
+    col1, col2, col3 = st.columns([3, 2, 3])
+    with col2:
+        if st.button("🔄 Clear Cache"):
+            st.cache_resource.clear()
+            st.experimental_rerun()
