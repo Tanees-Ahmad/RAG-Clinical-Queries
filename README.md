@@ -47,8 +47,6 @@ Query  →       v       →  Top-k Results
 
 
 
-````markdown
-
 ---
 
 ### 1. Clone the Repository
@@ -56,11 +54,12 @@ Query  →       v       →  Top-k Results
 ```bash
 git clone https://github.com/Tanees-Ahmad/RAG-Clinical-Queries.git
 cd RAG-Clinical-Queries
+
 ````
 
 ---
 
-### 2. Set Up Your Python Environment (Optional but Recommended)
+### 2. Set Up Your Python Environment
 
 ```bash
 python -m venv venv
